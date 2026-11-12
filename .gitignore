@@ -1,0 +1,13 @@
+# 构建产物
+build/
+dist/
+
+# Qt Creator / IDE 本地配置
+*.user
+.qtcreator/*.user
+CMakeLists.txt.user*
+*.autosave
+
+# 系统
+Thumbs.db
+.DS_Store
