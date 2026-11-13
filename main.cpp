@@ -3,12 +3,12 @@
 #include <QFileInfo>
 #include <QFont>
 #include <QGuiApplication>
+#include <QIcon>
 #include <QImage>
 #include <QQmlApplicationEngine>
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
-#include <QScreen>
 #include <QTimer>
 #include <QVariant>
 
@@ -17,12 +17,18 @@
 #include "iconprovider.h"
 #include "taskmodel.h"
 
+// 由 CMakeLists.txt 的 project(... VERSION ...) 注入
+#ifndef FORMATSTUDIO_VERSION
+#define FORMATSTUDIO_VERSION "0.0.0"
+#endif
+
 int main(int argc, char *argv[])
 {
     QGuiApplication app(argc, argv);
     app.setOrganizationName(QStringLiteral("FormatStudio"));
     app.setApplicationName(QStringLiteral("Format Studio"));
-    app.setApplicationVersion(QStringLiteral("0.2.0"));
+    app.setApplicationVersion(QStringLiteral(FORMATSTUDIO_VERSION));
+    app.setWindowIcon(QIcon(QStringLiteral(":/icons/app.png")));
 
     QQuickStyle::setStyle(QStringLiteral("Basic"));
 
@@ -100,7 +106,7 @@ int main(int argc, char *argv[])
 
     if (parser.isSet(QStringLiteral("fake-update"))) {
         QTimer::singleShot(400, &updates, [&updates]() {
-            updates.previewUpdate(QStringLiteral("0.2.1"),
+            updates.previewUpdate(QStringLiteral("0.2.2"),
                                   QStringLiteral("· 新增批量重命名\n"
                                                  "· 修复 WebM 转换进度不准确\n"
                                                  "· 优化长任务的内存占用"));

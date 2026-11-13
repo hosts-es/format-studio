@@ -1,4 +1,4 @@
-# Format Studio 0.2.0
+# Format Studio 0.2.1
 
 基于 **Qt 6 / QML** 的批量格式转换工作台，视频、音频、图片共用一条任务队列，底层调用 **FFmpeg** 完成真实转码。
 
@@ -38,7 +38,7 @@
 检查更新与提交反馈都指向 GitHub 仓库，默认 `hosts-es/format-studio`。
 在 **设置 → 更新与反馈** 里改成实际仓库（`owner/repo`）即可，无需重新编译。
 
-- 检查更新读取 `releases/latest` 的 `tag_name`，与当前版本（`V0.2.0`）比较；有新版时弹出对话框，确认后下载 Release 中的 `.exe` / `.msi` 并启动安装程序。
+- 检查更新读取 `releases/latest` 的 `tag_name`，与当前版本（`V0.2.1`）比较；有新版时弹出对话框，确认后下载 Release 中的 `.exe` / `.msi` 并启动安装程序。
 - 提交反馈会打开 `https://github.com/<repo>/issues/new`，标题、正文、标签（`bug` / `enhancement`）都已填好，确认后即发布；正文同时复制到剪贴板。
 
 ## 构建

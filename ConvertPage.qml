@@ -82,7 +82,7 @@ Item {
 
                 Text {
                     Layout.fillWidth: true
-                    text: "未检测到 ffmpeg，转换功能不可用。请把 ffmpeg.exe / ffprobe.exe 放到程序目录，或在设置中指定路径。"
+                    text: "未检测到转换组件，转换功能暂不可用。建议重新安装 Format Studio，或在设置中重新检测。"
                     color: Theme.text
                     font.pixelSize: 12
                     wrapMode: Text.WordWrap

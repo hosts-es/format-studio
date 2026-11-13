@@ -40,23 +40,14 @@ Item {
                         Layout.fillWidth: true
                         spacing: 18
 
-                        Rectangle {
+                        Image {
                             width: 64
                             height: 64
-                            radius: 18
-
-                            gradient: Gradient {
-                                GradientStop { position: 0.0; color: Theme.accent }
-                                GradientStop { position: 1.0; color: "#7C5BEF" }
-                            }
-
-                            Text {
-                                anchors.centerIn: parent
-                                text: "FS"
-                                color: "#FFFFFF"
-                                font.pixelSize: 24
-                                font.weight: Font.Bold
-                            }
+                            source: "qrc:/icons/app.png"
+                            sourceSize.width: 128
+                            sourceSize.height: 128
+                            fillMode: Image.PreserveAspectFit
+                            smooth: true
                         }
 
                         ColumnLayout {

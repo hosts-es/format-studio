@@ -56,24 +56,24 @@ ApplicationWindow {
                     Layout.fillWidth: true
                     Layout.preferredHeight: 58
 
-                    Rectangle {
-                        width: 40
-                        height: 40
-                        radius: 12
+                    Image {
+                        id: appLogo
+                        width: 46
+                        height: 46
                         anchors.centerIn: parent
+                        source: "qrc:/icons/app.png"
+                        sourceSize.width: 92
+                        sourceSize.height: 92
+                        fillMode: Image.PreserveAspectFit
+                        smooth: true
+                    }
 
-                        gradient: Gradient {
-                            GradientStop { position: 0.0; color: Theme.accent }
-                            GradientStop { position: 1.0; color: "#7C5BEF" }
-                        }
-
-                        Text {
-                            anchors.centerIn: parent
-                            text: "FS"
-                            color: "#FFFFFF"
-                            font.pixelSize: 15
-                            font.bold: true
-                        }
+                    Rectangle {
+                        anchors.fill: appLogo
+                        radius: 10
+                        color: "transparent"
+                        border.width: 1
+                        border.color: Theme.dark ? Qt.rgba(1, 1, 1, 0.10) : Qt.rgba(0, 0, 0, 0.08)
                     }
                 }
 

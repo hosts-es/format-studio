@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.16)
 
-project(format-studio VERSION 0.2.0 LANGUAGES CXX)
+project(format-studio VERSION 0.2.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -8,6 +8,10 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(Qt6 REQUIRED COMPONENTS Quick QuickControls2 Svg Network)
 
 qt_standard_project_setup(REQUIRES 6.5)
+
+if(WIN32)
+    enable_language(RC)
+endif()
 
 # Theme.qml is a QML singleton (pragma Singleton)
 set_source_files_properties(Theme.qml PROPERTIES QT_QML_SINGLETON_TYPE TRUE)
@@ -23,20 +27,45 @@ qt_add_executable(formatstudio
     githubservice.h
 )
 
-# Explicit list (no glob): the resource generation rules must be identical on
-# every configure, otherwise a stale build tree ends up without a rule for
-# qrc_icons.cpp and make fails with "No rule to make target".
+# 版本号只维护 project(... VERSION ...) 一处，C++ 通过这个宏读取。
+target_compile_definitions(formatstudio PRIVATE
+    FORMATSTUDIO_VERSION="${PROJECT_VERSION}"
+)
+
+# Windows 可执行文件图标 + 版本信息。
+# 说明：项目路径含空格，CMake 的 RC 编译规则会把 -I 参数拆坏（windres 报 "No such file"），
+# 所以这里手工调用 windres，并让它在源码目录用相对路径工作。
+if(WIN32)
+    set(FS_VERSION_COMMA "${PROJECT_VERSION_MAJOR},${PROJECT_VERSION_MINOR},${PROJECT_VERSION_PATCH},0")
+    configure_file("${CMAKE_CURRENT_SOURCE_DIR}/app.rc.in"
+                   "${CMAKE_CURRENT_BINARY_DIR}/app.rc"
+                   @ONLY)
+
+    set(FS_ICON_OBJ "${CMAKE_CURRENT_BINARY_DIR}/app_icon.rc.o")
+    add_custom_command(
+        OUTPUT "${FS_ICON_OBJ}"
+        COMMAND "${CMAKE_RC_COMPILER}" -O coff -i "${CMAKE_CURRENT_BINARY_DIR}/app.rc" -o "${FS_ICON_OBJ}"
+        DEPENDS "${CMAKE_CURRENT_BINARY_DIR}/app.rc"
+                "${CMAKE_CURRENT_SOURCE_DIR}/app.rc.in"
+                "${CMAKE_CURRENT_SOURCE_DIR}/icons/app.ico"
+        COMMENT "Compiling application icon and version info"
+        VERBATIM)
+    target_sources(formatstudio PRIVATE "${FS_ICON_OBJ}")
+endif()
+
 qt_add_resources(formatstudio "icons"
     PREFIX "/icons"
     BASE "icons"
     FILES
         icons/all.svg
         icons/alert.svg
+        icons/app.ico
+        icons/app.png
         icons/check.svg
         icons/chevron-down.svg
+        icons/chevron-left.svg
         icons/clock.svg
         icons/close.svg
-        icons/chevron-left.svg
         icons/doc.svg
         icons/download.svg
         icons/folder.svg
@@ -96,7 +125,7 @@ target_link_libraries(formatstudio
 )
 
 # Optional: bundle ffmpeg/ffprobe next to the executable for a self-contained app.
-#   cmake -DFS_FFMPEG_DIR="D:/format studio/format-studio" ..
+#   cmake -DFS_FFMPEG_DIR="D:/ffmpeg/bin" ..
 set(FS_FFMPEG_DIR "" CACHE PATH "Directory containing ffmpeg.exe / ffprobe.exe to bundle")
 if(EXISTS "${FS_FFMPEG_DIR}/ffmpeg.exe")
     file(GLOB FS_FFMPEG_FILES "${FS_FFMPEG_DIR}/*.exe" "${FS_FFMPEG_DIR}/*.dll")

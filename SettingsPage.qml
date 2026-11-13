@@ -29,7 +29,7 @@ Item {
             }
 
             Text {
-                text: "外观、转换参数与 ffmpeg 引擎"
+                text: "外观、转换默认值与运行环境"
                 color: Theme.textDim
                 font.pixelSize: 12
             }
@@ -205,69 +205,72 @@ Item {
                             onActivated: (index) => backend.overwritePolicy = index
                         }
                     }
-                }
-            }
-
-            // ── 输出 ──────────────────────────────────────────
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: outputColumn.implicitHeight + 36
-                radius: Theme.radius
-                color: Theme.surface
-                border.width: 1
-                border.color: Theme.border
-
-                ColumnLayout {
-                    id: outputColumn
-                    anchors.fill: parent
-                    anchors.margins: 18
-                    spacing: 12
-
-                    Text {
-                        text: "输出"
-                        color: Theme.text
-                        font.pixelSize: 14
-                        font.weight: Font.DemiBold
-                    }
 
                     Rectangle {
                         Layout.fillWidth: true
-                        Layout.preferredHeight: 44
-                        radius: Theme.radiusSm
-                        color: Theme.surfaceSunken
-                        border.width: 1
-                        border.color: Theme.border
+                        Layout.preferredHeight: 1
+                        color: Theme.border
+                    }
 
-                        RowLayout {
-                            anchors.fill: parent
-                            anchors.leftMargin: 12
-                            anchors.rightMargin: 8
-                            spacing: 10
+                    ColumnLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
 
-                            Icon {
-                                name: "folder"
-                                size: 15
-                                color: Theme.textDim
+                        ColumnLayout {
+                            spacing: 2
+
+                            Text {
+                                text: "输出文件夹"
+                                color: Theme.text
+                                font.pixelSize: 13
                             }
 
                             Text {
-                                Layout.fillWidth: true
-                                text: backend.outputDir
-                                color: Theme.text
-                                font.pixelSize: 12
-                                elide: Text.ElideMiddle
+                                text: "转换结果保存的位置"
+                                color: Theme.textDim
+                                font.pixelSize: 11
                             }
+                        }
 
-                            StudioButton {
-                                text: "更改"
-                                compact: true
-                                onClicked: folderDialog.open()
-                            }
+                        Rectangle {
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 44
+                            radius: Theme.radiusSm
+                            color: Theme.surfaceSunken
+                            border.width: 1
+                            border.color: Theme.border
 
-                            StudioButton {
-                                text: "打开"
-                                compact: true
-                                onClicked: backend.openOutputDir()
+                            RowLayout {
+                                anchors.fill: parent
+                                anchors.leftMargin: 12
+                                anchors.rightMargin: 8
+                                spacing: 10
+
+                                Icon {
+                                    name: "folder"
+                                    size: 15
+                                    color: Theme.textDim
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: backend.outputDir
+                                    color: Theme.text
+                                    font.pixelSize: 12
+                                    elide: Text.ElideMiddle
+                                }
+
+                                StudioButton {
+                                    text: "更改"
+                                    compact: true
+                                    onClicked: folderDialog.open()
+                                }
+
+                                StudioButton {
+                                    text: "打开"
+                                    compact: true
+                                    onClicked: backend.openOutputDir()
+                                }
                             }
                         }
                     }
@@ -289,6 +292,13 @@ Item {
                     anchors.margins: 18
                     spacing: 12
 
+                    Text {
+                        text: "前置环境检测"
+                        color: Theme.text
+                        font.pixelSize: 14
+                        font.weight: Font.DemiBold
+                    }
+
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 10
@@ -302,11 +312,7 @@ Item {
 
                         Text {
                             Layout.fillWidth: true
-                            text: backend.ffmpegReady
-                                  ? (backend.ffmpegVersion !== ""
-                                     ? "ffmpeg 已就绪 · " + backend.ffmpegVersion
-                                     : "ffmpeg 已就绪")
-                                  : "未检测到 ffmpeg"
+                            text: backend.ffmpegReady ? "转换组件已就绪" : "未检测到转换组件"
                             color: Theme.text
                             font.pixelSize: 13
                         }
@@ -321,92 +327,11 @@ Item {
 
                     Text {
                         Layout.fillWidth: true
-                        text: backend.ffmpegPath !== "" ? backend.ffmpegPath : "未找到可执行文件"
-                        color: Theme.textFaint
-                        font.pixelSize: 11
-                        elide: Text.ElideMiddle
-                        font.family: "Consolas"
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: "提示：把 ffmpeg.exe 与 ffprobe.exe 放到程序目录（或其 tools/ffmpeg 子目录）即可自动识别，也可以使用系统 PATH 中的 ffmpeg。"
+                        visible: !backend.ffmpegReady
+                        text: "转换组件缺失，转换功能将不可用。建议重新安装 Format Studio。"
                         color: Theme.textDim
                         font.pixelSize: 11
                         wrapMode: Text.WordWrap
-                    }
-                }
-            }
-
-            // ── 更新与反馈 ────────────────────────────────────
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: repoColumn.implicitHeight + 36
-                radius: Theme.radius
-                color: Theme.surface
-                border.width: 1
-                border.color: Theme.border
-
-                ColumnLayout {
-                    id: repoColumn
-                    anchors.fill: parent
-                    anchors.margins: 18
-                    spacing: 12
-
-                    Text {
-                        text: "更新与反馈"
-                        color: Theme.text
-                        font.pixelSize: 14
-                        font.weight: Font.DemiBold
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 16
-
-                        ColumnLayout {
-                            Layout.fillWidth: true
-                            spacing: 2
-
-                            Text {
-                                text: "GitHub 仓库"
-                                color: Theme.text
-                                font.pixelSize: 13
-                            }
-
-                            Text {
-                                text: "用于检查更新与提交反馈，格式 owner/repo"
-                                color: Theme.textDim
-                                font.pixelSize: 11
-                            }
-                        }
-
-                        TextField {
-                            id: repoField
-                            Layout.preferredWidth: 260
-                            text: updates.repo
-                            placeholderText: "owner/repo"
-                            font.pixelSize: 12
-                            color: Theme.text
-                            selectByMouse: true
-                            leftPadding: 10
-                            rightPadding: 10
-                            background: Rectangle {
-                                radius: 8
-                                color: Theme.surfaceSunken
-                                border.width: 1
-                                border.color: repoField.activeFocus ? Theme.accent : Theme.border
-                            }
-                            onEditingFinished: updates.repo = text
-                        }
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: "当前更新源 · " + updates.repo + "（检查更新时读取该仓库的 Latest Release）"
-                        color: Theme.textFaint
-                        font.pixelSize: 11
-                        elide: Text.ElideMiddle
                     }
                 }
             }
