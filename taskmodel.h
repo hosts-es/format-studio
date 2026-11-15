@@ -13,7 +13,8 @@ enum class TaskStatus {
     Done,
     Failed,
     Canceled,
-    Skipped
+    Skipped,
+    Paused
 };
 
 struct ConversionTask

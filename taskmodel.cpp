@@ -61,6 +61,7 @@ static QString statusText(TaskStatus status)
     case TaskStatus::Failed:   return QStringLiteral("失败");
     case TaskStatus::Canceled: return QStringLiteral("已取消");
     case TaskStatus::Skipped:  return QStringLiteral("已跳过");
+    case TaskStatus::Paused:   return QStringLiteral("已暂停");
     }
     return QString();
 }

@@ -53,6 +53,9 @@ int main(int argc, char *argv[])
     parser.addOption({ QStringLiteral("fake-update"), QStringLiteral("预览「发现新版本」对话框（开发用）") });
     parser.addOption({ QStringLiteral("pause-after"), QStringLiteral("毫秒后暂停队列（开发用）"), QStringLiteral("ms") });
     parser.addOption({ QStringLiteral("resume-after"), QStringLiteral("毫秒后继续队列（开发用）"), QStringLiteral("ms") });
+    parser.addOption({ QStringLiteral("pause-task-after"), QStringLiteral("毫秒后暂停第一个任务（开发用）"), QStringLiteral("ms") });
+    parser.addOption({ QStringLiteral("resume-task-after"), QStringLiteral("毫秒后继续第一个任务（开发用）"), QStringLiteral("ms") });
+    parser.addOption({ QStringLiteral("headless"), QStringLiteral("不显示窗口（开发用，避免误操作干扰测试）") });
     parser.process(app);
 
     ConverterBackend backend;
@@ -83,6 +86,9 @@ int main(int argc, char *argv[])
     const QStringList sizeParts = parser.value(QStringLiteral("size")).split(QLatin1Char('x'));
     if (sizeParts.size() == 2)
         window->resize(sizeParts.at(0).toInt(), sizeParts.at(1).toInt());
+
+    if (parser.isSet(QStringLiteral("headless")))
+        window->hide();
 
     const QString initialPage = parser.value(QStringLiteral("page"));
     if (initialPage != QLatin1String("convert"))
@@ -138,6 +144,21 @@ int main(int argc, char *argv[])
         QTimer::singleShot(parser.value(QStringLiteral("resume-after")).toInt(),
                            &backend, &ConverterBackend::resumeQueue);
 
+    if (parser.isSet(QStringLiteral("pause-task-after")))
+        QTimer::singleShot(parser.value(QStringLiteral("pause-task-after")).toInt(),
+                           &backend, [&backend]() {
+                               const QStringList ids = backend.tasks()->ids();
+                               if (!ids.isEmpty())
+                                   backend.pauseTask(ids.first());
+                           });
+    if (parser.isSet(QStringLiteral("resume-task-after")))
+        QTimer::singleShot(parser.value(QStringLiteral("resume-task-after")).toInt(),
+                           &backend, [&backend]() {
+                               const QStringList ids = backend.tasks()->ids();
+                               if (!ids.isEmpty())
+                                   backend.resumeTask(ids.first());
+                           });
+
     if (parser.isSet(QStringLiteral("smoke"))) {
         const QStringList inputs = parser.value(QStringLiteral("smoke"))
                                        .split(QLatin1Char(';'), Qt::SkipEmptyParts);
@@ -151,7 +172,8 @@ int main(int argc, char *argv[])
         QObject::connect(&backend, &ConverterBackend::countsChanged, &app, [&backend]() {
             if (backend.totalCount() == 0)
                 return;
-            if (backend.runningCount() == 0 && backend.queuedCount() == 0) {
+            if (backend.runningCount() == 0 && backend.pausedCount() == 0
+                && backend.queuedCount() == 0) {
                 qInfo("smoke result: total=%d done=%d failed=%d",
                       backend.totalCount(), backend.doneCount(), backend.failedCount());
                 QCoreApplication::exit(backend.failedCount() > 0 ? 2 : 0);

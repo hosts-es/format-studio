@@ -247,6 +247,7 @@ void ConverterBackend::setKindFilter(const QString &kind)
 int ConverterBackend::totalCount() const { return m_model->countAll(); }
 int ConverterBackend::queuedCount() const { return m_model->countByStatus(TaskStatus::Queued); }
 int ConverterBackend::runningCount() const { return m_model->countByStatus(TaskStatus::Running); }
+int ConverterBackend::pausedCount() const { return m_model->countByStatus(TaskStatus::Paused); }
 int ConverterBackend::doneCount() const { return m_model->countByStatus(TaskStatus::Done); }
 int ConverterBackend::failedCount() const { return m_model->countByStatus(TaskStatus::Failed); }
 bool ConverterBackend::hasQueued() const { return queuedCount() > 0; }
@@ -805,6 +806,11 @@ QStringList ConverterBackend::buildArguments(const ConversionTask &task, const Q
 void ConverterBackend::startTask(const QString &id)
 {
     if (m_running.contains(id)) {
+        ConversionTask *running = m_model->find(id);
+        if (running && running->status == TaskStatus::Paused) {
+            resumeTask(id);
+            return;
+        }
         emit toast(QStringLiteral("该任务正在转换中"), QStringLiteral("info"));
         return;
     }
@@ -1140,31 +1146,33 @@ void ConverterBackend::schedule()
     }
 }
 
-void ConverterBackend::setRunningSuspended(bool suspend)
+void ConverterBackend::suspendProcess(QProcess *proc, bool suspend)
 {
 #ifdef Q_OS_WIN
     // 格式工厂式的暂停：直接挂起 ffmpeg 进程，继续时从原位置接着转，
     // 不会重新开始，也不占用 CPU。
     NtProcessFn fn = ntProcessFunction(suspend ? "NtSuspendProcess" : "NtResumeProcess");
-    if (!fn)
+    if (!fn || !proc)
         return;
-
-    const auto processes = m_running;
-    for (QProcess *proc : processes) {
-        if (!proc)
-            continue;
-        const qint64 pid = proc->processId();
-        if (pid <= 0)
-            continue;
-        HANDLE handle = OpenProcess(0x0800 /* PROCESS_SUSPEND_RESUME */, FALSE, DWORD(pid));
-        if (!handle)
-            continue;
-        fn(handle);
-        CloseHandle(handle);
-    }
+    const qint64 pid = proc->processId();
+    if (pid <= 0)
+        return;
+    HANDLE handle = OpenProcess(0x0800 /* PROCESS_SUSPEND_RESUME */, FALSE, DWORD(pid));
+    if (!handle)
+        return;
+    fn(handle);
+    CloseHandle(handle);
 #else
+    Q_UNUSED(proc);
     Q_UNUSED(suspend);
 #endif
+}
+
+void ConverterBackend::setRunningSuspended(bool suspend)
+{
+    const auto processes = m_running;
+    for (QProcess *proc : processes)
+        suspendProcess(proc, suspend);
 }
 
 void ConverterBackend::startAll()
@@ -1203,7 +1211,17 @@ void ConverterBackend::pauseQueue()
 
     m_queueActive = false;
     m_suspended = !m_running.isEmpty();
-    setRunningSuspended(true);
+
+    const auto ids = m_running.keys();
+    for (const QString &id : ids) {
+        suspendProcess(m_running.value(id), true);
+        m_model->updateTask(id, [](ConversionTask &t) {
+            if (t.status == TaskStatus::Running)
+                t.status = TaskStatus::Paused;
+            t.speed.clear();
+        }, { TaskModel::StatusRole, TaskModel::StatusTextRole, TaskModel::SpeedRole });
+    }
+
     emit queueActiveChanged();
     log(QStringLiteral("WARN"), QStringLiteral("queue"),
         QStringLiteral("暂停 · 挂起 %1 个任务").arg(m_running.size()));
@@ -1216,17 +1234,22 @@ void ConverterBackend::resumeQueue()
     if (m_queueActive)
         return;
 
-    if (m_suspended) {
-        setRunningSuspended(false);
-        m_suspended = false;
-        log(QStringLiteral("INFO"), QStringLiteral("queue"), QStringLiteral("继续转换"));
-    }
-
-    if (!hasQueued() && runningCount() == 0)
+    if (!m_suspended && !hasQueued() && runningCount() == 0)
         return;
 
+    const auto ids = m_running.keys();
+    for (const QString &id : ids) {
+        suspendProcess(m_running.value(id), false);
+        m_model->updateTask(id, [](ConversionTask &t) {
+            if (t.status == TaskStatus::Paused)
+                t.status = TaskStatus::Running;
+        }, { TaskModel::StatusRole, TaskModel::StatusTextRole });
+    }
+
+    m_suspended = false;
     m_queueActive = true;
     emit queueActiveChanged();
+    log(QStringLiteral("INFO"), QStringLiteral("queue"), QStringLiteral("继续转换"));
     schedule();
 }
 
@@ -1278,8 +1301,45 @@ void ConverterBackend::cancelTask(const QString &id)
     }
 }
 
+void ConverterBackend::pauseTask(const QString &id)
+{
+    QProcess *proc = m_running.value(id);
+    if (!proc)
+        return;
+
+    suspendProcess(proc, true);
+    m_model->updateTask(id, [](ConversionTask &t) {
+        if (t.status == TaskStatus::Running)
+            t.status = TaskStatus::Paused;
+        t.speed.clear();
+    }, { TaskModel::StatusRole, TaskModel::StatusTextRole, TaskModel::SpeedRole });
+
+    if (const ConversionTask *task = m_model->find(id))
+        log(QStringLiteral("WARN"), QStringLiteral("task"),
+            QStringLiteral("暂停 %1").arg(QFileInfo(task->inputPath).fileName()));
+}
+
+void ConverterBackend::resumeTask(const QString &id)
+{
+    QProcess *proc = m_running.value(id);
+    if (!proc)
+        return;
+
+    suspendProcess(proc, false);
+    m_model->updateTask(id, [](ConversionTask &t) {
+        if (t.status == TaskStatus::Paused)
+            t.status = TaskStatus::Running;
+    }, { TaskModel::StatusRole, TaskModel::StatusTextRole });
+
+    if (const ConversionTask *task = m_model->find(id))
+        log(QStringLiteral("INFO"), QStringLiteral("task"),
+            QStringLiteral("继续 %1").arg(QFileInfo(task->inputPath).fileName()));
+}
+
 void ConverterBackend::retryTask(const QString &id)
 {
+    if (m_running.contains(id))
+        return;
     ConversionTask *task = m_model->find(id);
     if (!task)
         return;
@@ -1369,7 +1429,8 @@ void ConverterBackend::clearInternal(const QString &kind)
 void ConverterBackend::setTaskFormat(const QString &id, const QString &format)
 {
     ConversionTask *task = m_model->find(id);
-    if (!task || format.isEmpty() || task->status == TaskStatus::Running)
+    if (!task || format.isEmpty() || task->status == TaskStatus::Running
+        || task->status == TaskStatus::Paused)
         return;
     m_model->updateTask(id, [&](ConversionTask &t) {
         t.format = format;

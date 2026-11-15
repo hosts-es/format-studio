@@ -28,6 +28,7 @@ Rectangle {
     readonly property bool isCanceled: status === 4
     readonly property bool isSkipped: status === 5
 
+    readonly property bool isPaused: status === 6
     readonly property var formatOptions: backend.formatsFor(root.kind)
     readonly property var formatLabels: formatOptions.map(function (f) { return f.label })
 
@@ -122,7 +123,8 @@ Rectangle {
                     radius: 6
                     color: root.isDone ? Theme.successSoft
                            : root.isFailed ? Theme.dangerSoft
-                           : root.isRunning ? Theme.accentSoft : Theme.surfaceSunken
+                           : root.isRunning ? Theme.accentSoft
+                           : root.isPaused ? Theme.warningSoft : Theme.surfaceSunken
 
                     Text {
                         id: statusLabel
@@ -131,7 +133,8 @@ Rectangle {
                         font.pixelSize: 10
                         color: root.isDone ? Theme.success
                                : root.isFailed ? Theme.danger
-                               : root.isRunning ? Theme.accent : Theme.textDim
+                               : root.isRunning ? Theme.accent
+                               : root.isPaused ? Theme.warning : Theme.textDim
                     }
                 }
             }
@@ -189,6 +192,7 @@ Rectangle {
                         radius: 3
                         color: root.isFailed ? Theme.danger
                                : root.isDone ? Theme.success
+                               : root.isPaused ? Theme.warning
                                : root.isCanceled ? Theme.textFaint : Theme.accent
                         Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                     }
@@ -214,7 +218,7 @@ Rectangle {
                     horizontalAlignment: Text.AlignRight
                     font.pixelSize: 11
                     color: root.isDone ? Theme.success : root.isFailed ? Theme.danger : Theme.textDim
-                    text: (root.isRunning || root.isDone || root.isFailed || root.isCanceled)
+                    text: (root.isRunning || root.isPaused || root.isDone || root.isFailed || root.isCanceled)
                           ? Math.round(root.progress) + "%" : ""
                 }
             }
@@ -347,6 +351,20 @@ Rectangle {
 
             IconButton {
                 visible: root.isRunning
+                icon: "pause"
+                tooltip: "暂停该任务"
+                onClicked: backend.pauseTask(root.taskId)
+            }
+
+            IconButton {
+                visible: root.isPaused
+                icon: "play"
+                tooltip: "继续该任务"
+                onClicked: backend.resumeTask(root.taskId)
+            }
+
+            IconButton {
+                visible: root.isRunning || root.isPaused
                 icon: "stop"
                 tooltip: "取消该任务"
                 iconColor: Theme.danger
@@ -368,7 +386,7 @@ Rectangle {
             }
 
             IconButton {
-                visible: !root.isRunning
+                visible: !root.isRunning && !root.isPaused
                 icon: "trash"
                 tooltip: "移除任务"
                 onClicked: backend.removeTask(root.taskId)

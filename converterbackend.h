@@ -28,6 +28,7 @@ class ConverterBackend : public QObject
     Q_PROPERTY(int totalCount READ totalCount NOTIFY countsChanged)
     Q_PROPERTY(int queuedCount READ queuedCount NOTIFY countsChanged)
     Q_PROPERTY(int runningCount READ runningCount NOTIFY countsChanged)
+    Q_PROPERTY(int pausedCount READ pausedCount NOTIFY countsChanged)
     Q_PROPERTY(int doneCount READ doneCount NOTIFY countsChanged)
     Q_PROPERTY(int failedCount READ failedCount NOTIFY countsChanged)
     Q_PROPERTY(int overallProgress READ overallProgress NOTIFY countsChanged)
@@ -73,6 +74,7 @@ public:
     int totalCount() const;
     int queuedCount() const;
     int runningCount() const;
+    int pausedCount() const;
     int doneCount() const;
     int failedCount() const;
     int overallProgress() const;
@@ -101,6 +103,8 @@ public:
 
     Q_INVOKABLE void startAll();
     Q_INVOKABLE void startTask(const QString &id);
+    Q_INVOKABLE void pauseTask(const QString &id);
+    Q_INVOKABLE void resumeTask(const QString &id);
     Q_INVOKABLE void toggleQueue();
     Q_INVOKABLE void pauseQueue();
     Q_INVOKABLE void resumeQueue();
@@ -146,6 +150,7 @@ private:
     void log(const QString &level, const QString &module, const QString &text);
     void loadRecentLog();
     void setRunningSuspended(bool suspend);
+    void suspendProcess(QProcess *proc, bool suspend);
     QString logFilePath() const;
     void finishTask(const QString &id, int exitCode, QProcess::ExitStatus status);
     void handleProgressChunk(const QString &id);
