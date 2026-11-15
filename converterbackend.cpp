@@ -214,12 +214,12 @@ int ConverterBackend::overallProgress() const
         return 0;
     double sum = 0.0;
     for (const auto &t : tasks) {
-        if (t.status == TaskStatus::Done || t.status == TaskStatus::Failed
-            || t.status == TaskStatus::Canceled || t.status == TaskStatus::Skipped) {
+        // 只有真正完成的任务才算 100%；失败 / 取消 / 跳过保留中断时的进度，
+        // 否则任务一中断总进度会瞬间跳到满格，看起来像转换成功了。
+        if (t.status == TaskStatus::Done)
             sum += 100.0;
-        } else {
+        else
             sum += qBound(0.0, t.progress, 100.0);
-        }
     }
     return int(sum / tasks.size());
 }
@@ -1413,7 +1413,7 @@ void ConverterBackend::seedDemoData()
           "48 kHz · 立体声 · PCM · 00:32:10", 1930000, 369098752LL, 2, "" },
         { "海报_poster.png", "image", "webp", 2, 100.0, "", 0,
           "2400×1600 · PNG", 0, 18874368LL, 3, "" },
-        { "婚礼剪辑.mkv", "video", "mp4", 3, 0.0, "", -1,
+        { "婚礼剪辑.mkv", "video", "mp4", 3, 42.0, "", -1,
           "1280×720 · H.264 · AAC · 00:05:02", 302000, 734003200LL, 0,
           "文件损坏或格式无法识别" },
         { "背景音乐.flac", "audio", "wav", 0, 0.0, "", -1,

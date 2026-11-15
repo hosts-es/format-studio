@@ -187,7 +187,9 @@ Rectangle {
                         width: Math.max(0, Math.min(1, root.progress / 100)) * track.width
                         height: 5
                         radius: 3
-                        color: root.isFailed ? Theme.danger : root.isDone ? Theme.success : Theme.accent
+                        color: root.isFailed ? Theme.danger
+                               : root.isDone ? Theme.success
+                               : root.isCanceled ? Theme.textFaint : Theme.accent
                         Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                     }
                 }
@@ -212,7 +214,8 @@ Rectangle {
                     horizontalAlignment: Text.AlignRight
                     font.pixelSize: 11
                     color: root.isDone ? Theme.success : root.isFailed ? Theme.danger : Theme.textDim
-                    text: (root.isRunning || root.isDone) ? Math.round(root.progress) + "%" : ""
+                    text: (root.isRunning || root.isDone || root.isFailed || root.isCanceled)
+                          ? Math.round(root.progress) + "%" : ""
                 }
             }
 

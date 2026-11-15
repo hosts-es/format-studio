@@ -159,12 +159,11 @@ int TaskModel::visibleProgress() const
         if (!visible(t))
             continue;
         ++total;
-        if (t.status == TaskStatus::Done || t.status == TaskStatus::Failed
-            || t.status == TaskStatus::Canceled || t.status == TaskStatus::Skipped) {
+        // 失败 / 取消 / 跳过保留中断时的进度，不按 100% 计
+        if (t.status == TaskStatus::Done)
             sum += 100.0;
-        } else {
+        else
             sum += qBound(0.0, t.progress, 100.0);
-        }
     }
     if (total == 0)
         return 0;
