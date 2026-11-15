@@ -1,14 +1,14 @@
-﻿; Format Studio 安装包（Inno Setup 7）
+; Format Studio 安装包（Inno Setup 7）
 ;
 ; 生成步骤：
 ;   1. 生成 dist\FormatStudio-<版本>-win64 目录（Release exe + Qt 运行库 + ffmpeg）
 ;   2. 编译："D:\Inno Setup 7\ISCC.exe" installer\FormatStudio.iss
 ;   3. 产物：dist\FormatStudio-Setup-<版本>.exe
 ;
-; 版本号可在命令行覆盖：ISCC /DMyAppVersion=0.2.2 installer\FormatStudio.iss
+; 版本号可在命令行覆盖：ISCC /DMyAppVersion=0.2.3 installer\FormatStudio.iss
 
 #ifndef MyAppVersion
-  #define MyAppVersion "0.2.1"
+  #define MyAppVersion "0.2.2"
 #endif
 
 #define MyAppName "Format Studio"
