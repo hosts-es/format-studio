@@ -465,59 +465,6 @@ Item {
                 }
             }
 
-            // ── 任务数据 ──────────────────────────────────────
-            Rectangle {
-                Layout.fillWidth: true
-                implicitHeight: dangerColumn.implicitHeight + 36
-                radius: Theme.radius
-                color: Theme.surface
-                border.width: 1
-                border.color: Theme.border
-
-                ColumnLayout {
-                    id: dangerColumn
-                    anchors.fill: parent
-                    anchors.margins: 18
-                    spacing: 12
-
-                    Text {
-                        text: "任务数据"
-                        color: Theme.text
-                        font.pixelSize: 14
-                        font.weight: Font.DemiBold
-                    }
-
-                    RowLayout {
-                        Layout.fillWidth: true
-                        spacing: 10
-
-                        StudioButton {
-                            text: "清除已结束任务"
-                            compact: true
-                            enabled: (backend.doneCount + backend.failedCount) > 0
-                            onClicked: backend.removeFinished()
-                        }
-
-                        StudioButton {
-                            text: "清空全部任务"
-                            compact: true
-                            danger: true
-                            enabled: backend.totalCount > 0
-                            onClicked: backend.clearAll()
-                        }
-
-                        Item { Layout.fillWidth: true }
-                    }
-
-                    Text {
-                        Layout.fillWidth: true
-                        text: "转换结果不会被删除，只清理列表记录。"
-                        color: Theme.textFaint
-                        font.pixelSize: 11
-                    }
-                }
-            }
-
             Item { Layout.preferredHeight: 8 }
         }
     }
