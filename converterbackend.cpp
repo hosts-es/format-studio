@@ -1,11 +1,14 @@
 #include "converterbackend.h"
 
+#include <QClipboard>
 #include <QCoreApplication>
 #include <QDateTime>
 #include <QDesktopServices>
 #include <QDir>
 #include <QDirIterator>
+#include <QFile>
 #include <QFileInfo>
+#include <QGuiApplication>
 #include <QImage>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -13,6 +16,8 @@
 #include <QLinearGradient>
 #include <QPainter>
 #include <QStandardPaths>
+#include <QSysInfo>
+#include <QTime>
 #include <QUrl>
 #include <QUuid>
 
@@ -48,6 +53,17 @@ bool isImageSuffix(const QString &s)
 QVariantMap fmtEntry(const QString &ext, const QString &label, const QString &note)
 {
     return { { "ext", ext }, { "label", label }, { "note", note } };
+}
+
+QString lastNonEmptyLine(const QString &text)
+{
+    const QStringList lines = text.split(QLatin1Char('\n'));
+    for (int i = lines.size() - 1; i >= 0; --i) {
+        const QString line = lines.at(i).trimmed();
+        if (!line.isEmpty())
+            return line.left(300);
+    }
+    return QString();
 }
 
 QString humanError(const QString &stderrText, int exitCode)
@@ -88,6 +104,12 @@ ConverterBackend::ConverterBackend(QObject *parent)
 
     readSettings();
     m_model->setKindFilter(m_kindFilter);
+
+    loadRecentLog();
+    log(QStringLiteral("info"),
+        QStringLiteral("应用启动 · Format Studio %1 · %2")
+            .arg(QCoreApplication::applicationVersion(), QSysInfo::prettyProductName()));
+
     detectFfmpeg();
 
     connect(m_model, &TaskModel::countsChanged, this, &ConverterBackend::countsChanged);
@@ -434,6 +456,7 @@ void ConverterBackend::addPaths(const QStringList &paths)
     }
 
     if (added > 0) {
+        log(QStringLiteral("info"), QStringLiteral("已添加 %1 个任务").arg(added));
         if (elsewhere == added && !firstKind.isEmpty()) {
             setKindFilter(firstKind);
             emit toast(QStringLiteral("已添加 %1 个%2任务，已切换到对应分类")
@@ -771,7 +794,7 @@ void ConverterBackend::startTaskInternal(const QString &id)
     if (!task || task->status == TaskStatus::Done)
         return;
     if (m_ffmpeg.isEmpty()) {
-        emit toast(QStringLiteral("未找到 ffmpeg，请先在设置中指定路径"), QStringLiteral("error"));
+        emit toast(QStringLiteral("未检测到转换组件，无法开始转换"), QStringLiteral("error"));
         return;
     }
 
@@ -781,6 +804,9 @@ void ConverterBackend::startTaskInternal(const QString &id)
             t.status = TaskStatus::Skipped;
             t.error = QStringLiteral("输出文件已存在，已按设置跳过");
         }, { TaskModel::StatusRole, TaskModel::StatusTextRole, TaskModel::ErrorRole });
+        log(QStringLiteral("warning"),
+            QStringLiteral("已跳过：%1（输出文件已存在）")
+                .arg(QFileInfo(task->inputPath).fileName()));
         return;
     }
 
@@ -815,6 +841,11 @@ void ConverterBackend::startTaskInternal(const QString &id)
          TaskModel::SpeedRole, TaskModel::EtaRole, TaskModel::ErrorRole,
          TaskModel::OutputPathRole, TaskModel::OutputSizeRole });
 
+    m_startedAt.insert(id, QDateTime::currentMSecsSinceEpoch());
+    log(QStringLiteral("info"),
+        QStringLiteral("开始转换：%1 → %2")
+            .arg(QFileInfo(task->inputPath).fileName(), task->format.toUpper()));
+
     connect(proc, &QProcess::readyReadStandardOutput, this, [this, id]() { handleProgressChunk(id); });
     connect(proc, &QProcess::readyReadStandardError, this, [this, id]() { handleLogChunk(id); });
     connect(proc, &QProcess::finished, this, [this, id](int exitCode, QProcess::ExitStatus status) {
@@ -847,6 +878,11 @@ void ConverterBackend::failTask(const QString &id, const QString &reason)
         t.etaMs = -1;
     }, { TaskModel::StatusRole, TaskModel::StatusTextRole, TaskModel::ErrorRole,
          TaskModel::SpeedRole, TaskModel::EtaRole });
+    m_startedAt.remove(id);
+    if (const ConversionTask *task = m_model->find(id))
+        log(QStringLiteral("error"),
+            QStringLiteral("无法开始：%1 — %2")
+                .arg(QFileInfo(task->inputPath).fileName(), reason));
     emit toast(reason, QStringLiteral("error"));
     schedule();
 }
@@ -940,6 +976,9 @@ void ConverterBackend::finishTask(const QString &id, int exitCode, QProcess::Exi
             t.progress = qBound(0.0, t.progress, 100.0);
         }, { TaskModel::StatusRole, TaskModel::StatusTextRole, TaskModel::SpeedRole,
              TaskModel::EtaRole, TaskModel::ProgressRole });
+        m_startedAt.remove(id);
+        log(QStringLiteral("warning"),
+            QStringLiteral("已取消：%1").arg(QFileInfo(task->inputPath).fileName()));
         schedule();
         return;
     }
@@ -954,6 +993,13 @@ void ConverterBackend::finishTask(const QString &id, int exitCode, QProcess::Exi
             t.etaMs = -1;
         }, { TaskModel::StatusRole, TaskModel::StatusTextRole, TaskModel::ErrorRole,
              TaskModel::LogRole, TaskModel::SpeedRole, TaskModel::EtaRole });
+        m_startedAt.remove(id);
+        const QString fileName = QFileInfo(task->inputPath).fileName();
+        log(QStringLiteral("error"),
+            QStringLiteral("转换失败：%1 — %2").arg(fileName, reason));
+        const QString detail = lastNonEmptyLine(tail);
+        if (!detail.isEmpty() && !reason.contains(detail))
+            log(QStringLiteral("error"), QStringLiteral("ffmpeg：%1").arg(detail));
         emit toast(reason, QStringLiteral("error"));
         schedule();
         return;
@@ -967,6 +1013,10 @@ void ConverterBackend::finishTask(const QString &id, int exitCode, QProcess::Exi
             t.etaMs = -1;
         }, { TaskModel::StatusRole, TaskModel::StatusTextRole, TaskModel::ErrorRole,
              TaskModel::SpeedRole, TaskModel::EtaRole });
+        m_startedAt.remove(id);
+        log(QStringLiteral("error"),
+            QStringLiteral("转换失败：%1 — 输出文件未生成")
+                .arg(QFileInfo(task->inputPath).fileName()));
         emit toast(QStringLiteral("输出文件未生成"), QStringLiteral("error"));
         schedule();
         return;
@@ -982,6 +1032,19 @@ void ConverterBackend::finishTask(const QString &id, int exitCode, QProcess::Exi
     }, { TaskModel::StatusRole, TaskModel::StatusTextRole, TaskModel::ProgressRole,
          TaskModel::SpeedRole, TaskModel::EtaRole, TaskModel::OutputSizeRole,
          TaskModel::ErrorRole });
+
+    {
+        const qint64 started = m_startedAt.take(id);
+        const qint64 seconds = started > 0
+                                   ? qMax<qint64>(1, (QDateTime::currentMSecsSinceEpoch() - started) / 1000)
+                                   : 0;
+        const QString fileName = QFileInfo(task->inputPath).fileName();
+        log(QStringLiteral("success"),
+            seconds > 0
+                ? QStringLiteral("转换完成：%1 → %2（%3 秒）")
+                      .arg(fileName, task->format.toUpper()).arg(seconds)
+                : QStringLiteral("转换完成：%1 → %2").arg(fileName, task->format.toUpper()));
+    }
 
     schedule();
 }
@@ -1060,7 +1123,8 @@ void ConverterBackend::startAll()
         return;
     }
     if (m_ffmpeg.isEmpty()) {
-        emit toast(QStringLiteral("未找到 ffmpeg，请先在设置中指定路径"), QStringLiteral("error"));
+        emit toast(QStringLiteral("未检测到转换组件，无法开始转换"), QStringLiteral("error"));
+        log(QStringLiteral("error"), QStringLiteral("未检测到转换组件，转换无法开始"));
         return;
     }
     m_activeKind = kind;
@@ -1353,8 +1417,123 @@ void ConverterBackend::detectFfmpeg()
         proc->start(m_ffmpeg, { QStringLiteral("-version") });
     }
 
-    if (changed || !m_ffmpeg.isEmpty())
+    if (changed || !m_ffmpeg.isEmpty()) {
+        if (changed) {
+            if (m_ffmpeg.isEmpty())
+                log(QStringLiteral("error"), QStringLiteral("未检测到转换组件"));
+            else
+                log(QStringLiteral("info"),
+                    QStringLiteral("转换组件就绪：%1").arg(QFileInfo(m_ffmpeg).fileName()));
+        }
         emit ffmpegChanged();
+    }
+}
+
+QString ConverterBackend::logFilePath() const
+{
+    QString dir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation);
+    if (dir.isEmpty())
+        dir = QDir::tempPath();
+    QDir().mkpath(dir);
+    return QDir(dir).filePath(QStringLiteral("FormatStudio.log"));
+}
+
+void ConverterBackend::log(const QString &level, const QString &text)
+{
+    const QDateTime now = QDateTime::currentDateTime();
+
+    m_logEntries.append(QVariantMap{
+        { QStringLiteral("time"), now.toString(QStringLiteral("HH:mm:ss")) },
+        { QStringLiteral("level"), level },
+        { QStringLiteral("text"), text },
+    });
+    while (m_logEntries.size() > 200)
+        m_logEntries.removeFirst();
+    emit logEntriesChanged();
+
+    const QString path = logFilePath();
+    const QFileInfo info(path);
+    if (info.exists() && info.size() > 2 * 1024 * 1024)
+        QFile::remove(path);
+
+    QFile file(path);
+    if (file.open(QIODevice::WriteOnly | QIODevice::Append | QIODevice::Text)) {
+        file.write(QStringLiteral("%1 [%2] %3\n")
+                       .arg(now.toString(Qt::ISODate), level, text)
+                       .toUtf8());
+    }
+}
+
+void ConverterBackend::loadRecentLog()
+{
+    QFile file(logFilePath());
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+        return;
+
+    QStringList lines;
+    while (!file.atEnd()) {
+        const QString line = QString::fromUtf8(file.readLine()).trimmed();
+        if (line.isEmpty())
+            continue;
+        lines << line;
+        if (lines.size() > 40)
+            lines.removeFirst();
+    }
+    file.close();
+
+    for (const QString &line : std::as_const(lines)) {
+        const int open = line.indexOf(QLatin1Char('['));
+        const int close = line.indexOf(QLatin1Char(']'), open + 1);
+        QString time = open > 0 ? line.left(open).trimmed() : QString();
+        if (time.size() >= 19)
+            time = time.mid(11, 8);
+        const QString level = (open >= 0 && close > open)
+                                  ? line.mid(open + 1, close - open - 1)
+                                  : QStringLiteral("info");
+        const QString text = close > 0 ? line.mid(close + 1).trimmed() : line;
+        m_logEntries.append(QVariantMap{
+            { QStringLiteral("time"), time },
+            { QStringLiteral("level"), level },
+            { QStringLiteral("text"), text },
+        });
+    }
+    emit logEntriesChanged();
+}
+
+void ConverterBackend::clearLog()
+{
+    m_logEntries.clear();
+    emit logEntriesChanged();
+
+    QFile file(logFilePath());
+    if (file.open(QIODevice::WriteOnly | QIODevice::Truncate))
+        file.close();
+}
+
+void ConverterBackend::openLogFile()
+{
+    const QString path = logFilePath();
+    if (!QFileInfo::exists(path)) {
+        QFile file(path);
+        if (file.open(QIODevice::WriteOnly))
+            file.close();
+    }
+    QDesktopServices::openUrl(QUrl::fromLocalFile(path));
+}
+
+void ConverterBackend::copyLog()
+{
+    QStringList lines;
+    for (const QVariant &entry : std::as_const(m_logEntries)) {
+        const QVariantMap map = entry.toMap();
+        lines << QStringLiteral("%1 [%2] %3")
+                     .arg(map.value(QStringLiteral("time")).toString(),
+                          map.value(QStringLiteral("level")).toString(),
+                          map.value(QStringLiteral("text")).toString());
+    }
+    if (QClipboard *clipboard = QGuiApplication::clipboard())
+        clipboard->setText(lines.join(QLatin1Char('\n')));
+    emit toast(QStringLiteral("日志已复制到剪贴板"), QStringLiteral("info"));
 }
 
 void ConverterBackend::seedDemoData()

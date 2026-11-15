@@ -33,6 +33,7 @@ class ConverterBackend : public QObject
     Q_PROPERTY(int overallProgress READ overallProgress NOTIFY countsChanged)
     Q_PROPERTY(bool hasQueued READ hasQueued NOTIFY countsChanged)
     Q_PROPERTY(bool queueActive READ queueActive NOTIFY queueActiveChanged)
+    Q_PROPERTY(QVariantList logEntries READ logEntries NOTIFY logEntriesChanged)
 
     Q_PROPERTY(bool ffmpegReady READ ffmpegReady NOTIFY ffmpegChanged)
     Q_PROPERTY(QString ffmpegVersion READ ffmpegVersion NOTIFY ffmpegChanged)
@@ -112,6 +113,10 @@ public:
     Q_INVOKABLE void openOutputDir();
     Q_INVOKABLE void chooseOutputDir(const QVariant &urlOrPath);
     Q_INVOKABLE int countKind(const QString &kind) const;
+    Q_INVOKABLE QVariantList logEntries() const { return m_logEntries; }
+    Q_INVOKABLE void clearLog();
+    Q_INVOKABLE void openLogFile();
+    Q_INVOKABLE void copyLog();
     Q_INVOKABLE void detectFfmpeg();
     Q_INVOKABLE void seedDemoData();
 
@@ -127,6 +132,7 @@ signals:
     void countsChanged();
     void queueActiveChanged();
     void ffmpegChanged();
+    void logEntriesChanged();
 
 private:
     void schedule();
@@ -135,6 +141,9 @@ private:
     static QString kindLabel(const QString &kind);
     void removeFinishedInternal(const QString &kind);
     void clearInternal(const QString &kind);
+    void log(const QString &level, const QString &text);
+    void loadRecentLog();
+    QString logFilePath() const;
     void finishTask(const QString &id, int exitCode, QProcess::ExitStatus status);
     void handleProgressChunk(const QString &id);
     void handleLogChunk(const QString &id);
@@ -174,4 +183,7 @@ private:
     QString m_ffprobe;
     QString m_ffmpegVersion;
     QString m_ffmpegDir;
+
+    QVariantList m_logEntries;
+    QHash<QString, qint64> m_startedAt;
 };

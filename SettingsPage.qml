@@ -336,6 +336,135 @@ Item {
                 }
             }
 
+            // ── 运行日志 ──────────────────────────────────────
+            Rectangle {
+                Layout.fillWidth: true
+                implicitHeight: logColumn.implicitHeight + 36
+                radius: Theme.radius
+                color: Theme.surface
+                border.width: 1
+                border.color: Theme.border
+
+                ColumnLayout {
+                    id: logColumn
+                    anchors.fill: parent
+                    anchors.margins: 18
+                    spacing: 12
+
+                    RowLayout {
+                        Layout.fillWidth: true
+                        spacing: 8
+
+                        Text {
+                            text: "运行日志"
+                            color: Theme.text
+                            font.pixelSize: 14
+                            font.weight: Font.DemiBold
+                        }
+
+                        Item { Layout.fillWidth: true }
+
+                        StudioButton {
+                            text: "复制"
+                            compact: true
+                            enabled: backend.logEntries.length > 0
+                            onClicked: backend.copyLog()
+                        }
+
+                        StudioButton {
+                            text: "打开日志文件"
+                            compact: true
+                            onClicked: backend.openLogFile()
+                        }
+
+                        StudioButton {
+                            text: "清空"
+                            compact: true
+                            danger: true
+                            enabled: backend.logEntries.length > 0
+                            onClicked: backend.clearLog()
+                        }
+                    }
+
+                    Rectangle {
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: 230
+                        radius: Theme.radiusSm
+                        color: Theme.surfaceSunken
+                        border.width: 1
+                        border.color: Theme.border
+                        clip: true
+
+                        ListView {
+                            id: logList
+                            anchors.fill: parent
+                            anchors.margins: 10
+                            model: backend.logEntries
+                            spacing: 6
+                            clip: true
+                            boundsBehavior: Flickable.StopAtBounds
+                            onCountChanged: positionViewAtEnd()
+                            ScrollBar.vertical: ScrollBar {
+                                policy: ScrollBar.AsNeeded
+                                contentItem: Rectangle {
+                                    implicitWidth: 6
+                                    radius: 3
+                                    color: Theme.borderStrong
+                                    opacity: 0.5
+                                }
+                                background: Item {}
+                            }
+
+                            delegate: RowLayout {
+                                width: logList.width - 8
+                                spacing: 10
+
+                                Text {
+                                    text: modelData.time
+                                    color: Theme.textFaint
+                                    font.pixelSize: 10
+                                    font.family: "Consolas"
+                                    Layout.preferredWidth: 56
+                                }
+
+                                Rectangle {
+                                    width: 6
+                                    height: 6
+                                    radius: 3
+                                    Layout.alignment: Qt.AlignTop
+                                    Layout.topMargin: 6
+                                    color: modelData.level === "success" ? Theme.success
+                                           : modelData.level === "error" ? Theme.danger
+                                           : modelData.level === "warning" ? Theme.warning
+                                           : Theme.textFaint
+                                }
+
+                                Text {
+                                    Layout.fillWidth: true
+                                    text: modelData.text
+                                    color: modelData.level === "error" ? Theme.danger
+                                           : modelData.level === "success" ? Theme.text
+                                           : Theme.textDim
+                                    font.pixelSize: 11
+                                    wrapMode: Text.Wrap
+                                }
+                            }
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            width: parent.width - 40
+                            horizontalAlignment: Text.AlignHCenter
+                            visible: backend.logEntries.length === 0
+                            text: "还没有日志记录，执行一次转换后这里会显示过程"
+                            color: Theme.textFaint
+                            font.pixelSize: 11
+                            wrapMode: Text.WordWrap
+                        }
+                    }
+                }
+            }
+
             // ── 任务数据 ──────────────────────────────────────
             Rectangle {
                 Layout.fillWidth: true
