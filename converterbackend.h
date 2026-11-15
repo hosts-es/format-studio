@@ -141,7 +141,7 @@ private:
     static QString kindLabel(const QString &kind);
     void removeFinishedInternal(const QString &kind);
     void clearInternal(const QString &kind);
-    void log(const QString &level, const QString &text);
+    void log(const QString &level, const QString &module, const QString &text);
     void loadRecentLog();
     QString logFilePath() const;
     void finishTask(const QString &id, int exitCode, QProcess::ExitStatus status);

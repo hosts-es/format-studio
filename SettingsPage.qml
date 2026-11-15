@@ -424,26 +424,36 @@ Item {
                                     color: Theme.textFaint
                                     font.pixelSize: 10
                                     font.family: "Consolas"
-                                    Layout.preferredWidth: 56
+                                    Layout.preferredWidth: 54
                                 }
 
-                                Rectangle {
-                                    width: 6
-                                    height: 6
-                                    radius: 3
-                                    Layout.alignment: Qt.AlignTop
-                                    Layout.topMargin: 6
-                                    color: modelData.level === "success" ? Theme.success
-                                           : modelData.level === "error" ? Theme.danger
-                                           : modelData.level === "warning" ? Theme.warning
+                                Text {
+                                    text: modelData.level
+                                    color: modelData.level === "OK" ? Theme.success
+                                           : modelData.level === "ERROR" ? Theme.danger
+                                           : modelData.level === "WARN" ? Theme.warning
                                            : Theme.textFaint
+                                    font.pixelSize: 10
+                                    font.family: "Consolas"
+                                    font.weight: modelData.level === "ERROR" ? Font.DemiBold
+                                                                             : Font.Normal
+                                    Layout.preferredWidth: 42
+                                }
+
+                                Text {
+                                    text: "[" + modelData.module + "]"
+                                    visible: modelData.module !== ""
+                                    color: Theme.textFaint
+                                    font.pixelSize: 10
+                                    font.family: "Consolas"
+                                    Layout.preferredWidth: 44
                                 }
 
                                 Text {
                                     Layout.fillWidth: true
                                     text: modelData.text
-                                    color: modelData.level === "error" ? Theme.danger
-                                           : modelData.level === "success" ? Theme.text
+                                    color: modelData.level === "ERROR" ? Theme.danger
+                                           : modelData.level === "OK" ? Theme.text
                                            : Theme.textDim
                                     font.pixelSize: 11
                                     wrapMode: Text.Wrap
