@@ -51,6 +51,8 @@ int main(int argc, char *argv[])
     parser.addOption({ QStringLiteral("repo"), QStringLiteral("临时覆盖 GitHub 仓库 owner/repo"), QStringLiteral("repo") });
     parser.addOption({ QStringLiteral("check-update"), QStringLiteral("检查更新后退出（开发用）") });
     parser.addOption({ QStringLiteral("fake-update"), QStringLiteral("预览「发现新版本」对话框（开发用）") });
+    parser.addOption({ QStringLiteral("pause-after"), QStringLiteral("毫秒后暂停队列（开发用）"), QStringLiteral("ms") });
+    parser.addOption({ QStringLiteral("resume-after"), QStringLiteral("毫秒后继续队列（开发用）"), QStringLiteral("ms") });
     parser.process(app);
 
     ConverterBackend backend;
@@ -128,6 +130,13 @@ int main(int argc, char *argv[])
         QTimer::singleShot(300, &updates, &GithubService::checkForUpdates);
         QTimer::singleShot(12000, &app, []() { QCoreApplication::exit(3); });
     }
+
+    if (parser.isSet(QStringLiteral("pause-after")))
+        QTimer::singleShot(parser.value(QStringLiteral("pause-after")).toInt(),
+                           &backend, &ConverterBackend::pauseQueue);
+    if (parser.isSet(QStringLiteral("resume-after")))
+        QTimer::singleShot(parser.value(QStringLiteral("resume-after")).toInt(),
+                           &backend, &ConverterBackend::resumeQueue);
 
     if (parser.isSet(QStringLiteral("smoke"))) {
         const QStringList inputs = parser.value(QStringLiteral("smoke"))

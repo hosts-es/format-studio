@@ -358,7 +358,7 @@ Item {
                 spacing: 14
 
                 Text {
-                    text: "已完成 " + backend.tasks.visibleDone + " / " + backend.tasks.visibleTotal
+                    text: "队列已完成 " + backend.doneCount + " / " + backend.totalCount
                     color: Theme.text
                     font.pixelSize: 12
                 }
@@ -378,7 +378,7 @@ Item {
 
                     Rectangle {
                         anchors.verticalCenter: parent.verticalCenter
-                        width: Math.max(0, Math.min(100, backend.tasks.visibleProgress)) / 100 * overallTrack.width
+                        width: Math.max(0, Math.min(100, backend.overallProgress)) / 100 * overallTrack.width
                         height: 6
                         radius: 3
                         color: Theme.accent
@@ -387,7 +387,7 @@ Item {
                 }
 
                 Text {
-                    text: backend.tasks.visibleProgress + "%"
+                    text: backend.overallProgress + "%"
                     color: Theme.textDim
                     font.pixelSize: 11
                     Layout.preferredWidth: 34
@@ -396,18 +396,19 @@ Item {
                 Item { Layout.fillWidth: true }
 
                 StudioButton {
-                    text: "停止"
+                    text: "停止全部"
                     icon: "stop"
                     danger: true
-                    visible: backend.runningCount > 0 || backend.queueActive
+                    visible: backend.runningCount > 0 || backend.queueActive || backend.paused
                     onClicked: backend.stopAll()
                 }
 
                 StudioButton {
-                    text: backend.queueActive ? "暂停队列" : "开始转换"
+                    text: backend.queueActive ? "暂停全部"
+                          : backend.paused ? "继续全部" : "开始全部"
                     icon: backend.queueActive ? "pause" : "play"
                     primary: !backend.queueActive
-                    enabled: backend.queueActive ? true : backend.tasks.visibleQueued > 0
+                    enabled: backend.queueActive || backend.paused || backend.hasQueued
                     onClicked: backend.toggleQueue()
                 }
             }

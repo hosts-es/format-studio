@@ -33,6 +33,7 @@ class ConverterBackend : public QObject
     Q_PROPERTY(int overallProgress READ overallProgress NOTIFY countsChanged)
     Q_PROPERTY(bool hasQueued READ hasQueued NOTIFY countsChanged)
     Q_PROPERTY(bool queueActive READ queueActive NOTIFY queueActiveChanged)
+    Q_PROPERTY(bool paused READ paused NOTIFY queueActiveChanged)
     Q_PROPERTY(QVariantList logEntries READ logEntries NOTIFY logEntriesChanged)
 
     Q_PROPERTY(bool ffmpegReady READ ffmpegReady NOTIFY ffmpegChanged)
@@ -77,6 +78,7 @@ public:
     int overallProgress() const;
     bool hasQueued() const;
     bool queueActive() const { return m_queueActive; }
+    bool paused() const { return m_suspended; }
 
     bool ffmpegReady() const { return !m_ffmpeg.isEmpty(); }
     QString ffmpegVersion() const { return m_ffmpegVersion; }
@@ -143,6 +145,7 @@ private:
     void clearInternal(const QString &kind);
     void log(const QString &level, const QString &module, const QString &text);
     void loadRecentLog();
+    void setRunningSuspended(bool suspend);
     QString logFilePath() const;
     void finishTask(const QString &id, int exitCode, QProcess::ExitStatus status);
     void handleProgressChunk(const QString &id);
@@ -171,6 +174,7 @@ private:
     QString m_kindFilter = QStringLiteral("video");
     QString m_activeKind;   // category the running queue is working on
     bool m_queueActive = false;
+    bool m_suspended = false;   // ffmpeg 进程是否被挂起（真正的暂停）
 
     QHash<QString, QString> m_defaultFormats;
     QHash<QString, QProcess *> m_running;

@@ -21,6 +21,10 @@
 #include <QUrl>
 #include <QUuid>
 
+#ifdef Q_OS_WIN
+#  include <windows.h>
+#endif
+
 #include <utility>
 
 namespace {
@@ -65,6 +69,16 @@ QString lastNonEmptyLine(const QString &text)
     }
     return QString();
 }
+
+#ifdef Q_OS_WIN
+using NtProcessFn = LONG(NTAPI *)(HANDLE);
+
+NtProcessFn ntProcessFunction(const char *name)
+{
+    static HMODULE ntdll = GetModuleHandleW(L"ntdll.dll");
+    return ntdll ? reinterpret_cast<NtProcessFn>(GetProcAddress(ntdll, name)) : nullptr;
+}
+#endif
 
 QString humanSize(qint64 bytes)
 {
@@ -1126,12 +1140,37 @@ void ConverterBackend::schedule()
     }
 }
 
+void ConverterBackend::setRunningSuspended(bool suspend)
+{
+#ifdef Q_OS_WIN
+    // 格式工厂式的暂停：直接挂起 ffmpeg 进程，继续时从原位置接着转，
+    // 不会重新开始，也不占用 CPU。
+    NtProcessFn fn = ntProcessFunction(suspend ? "NtSuspendProcess" : "NtResumeProcess");
+    if (!fn)
+        return;
+
+    const auto processes = m_running;
+    for (QProcess *proc : processes) {
+        if (!proc)
+            continue;
+        const qint64 pid = proc->processId();
+        if (pid <= 0)
+            continue;
+        HANDLE handle = OpenProcess(0x0800 /* PROCESS_SUSPEND_RESUME */, FALSE, DWORD(pid));
+        if (!handle)
+            continue;
+        fn(handle);
+        CloseHandle(handle);
+    }
+#else
+    Q_UNUSED(suspend);
+#endif
+}
+
 void ConverterBackend::startAll()
 {
-    const QString kind = currentKind();
-    if (!hasQueuedFor(kind)) {
-        emit toast(QStringLiteral("「%1」分类没有等待转换的任务").arg(kindLabel(kind)),
-                   QStringLiteral("info"));
+    if (!hasQueued()) {
+        emit toast(QStringLiteral("没有等待转换的任务"), QStringLiteral("info"));
         return;
     }
     if (m_ffmpeg.isEmpty()) {
@@ -1140,7 +1179,7 @@ void ConverterBackend::startAll()
             QStringLiteral("未检测到转换组件，转换无法开始"));
         return;
     }
-    m_activeKind = kind;
+    m_activeKind.clear();
     m_queueActive = true;
     emit queueActiveChanged();
     schedule();
@@ -1148,17 +1187,12 @@ void ConverterBackend::startAll()
 
 void ConverterBackend::toggleQueue()
 {
-    const QString kind = currentKind();
     if (m_queueActive) {
         pauseQueue();
-    } else if (hasQueuedFor(kind) || runningCount() > 0) {
-        m_activeKind = kind;
-        m_queueActive = true;
-        emit queueActiveChanged();
-        schedule();
+    } else if (m_suspended || hasQueued() || runningCount() > 0) {
+        resumeQueue();
     } else {
-        emit toast(QStringLiteral("「%1」分类没有等待转换的任务").arg(kindLabel(kind)),
-                   QStringLiteral("info"));
+        emit toast(QStringLiteral("没有等待转换的任务"), QStringLiteral("info"));
     }
 }
 
@@ -1166,17 +1200,31 @@ void ConverterBackend::pauseQueue()
 {
     if (!m_queueActive)
         return;
+
     m_queueActive = false;
+    m_suspended = !m_running.isEmpty();
+    setRunningSuspended(true);
     emit queueActiveChanged();
-    emit toast(QStringLiteral("队列已暂停，当前任务将继续完成"), QStringLiteral("info"));
+    log(QStringLiteral("WARN"), QStringLiteral("queue"),
+        QStringLiteral("暂停 · 挂起 %1 个任务").arg(m_running.size()));
+    emit toast(QStringLiteral("已暂停，点「继续全部」从当前位置接着转换"),
+               QStringLiteral("info"));
 }
 
 void ConverterBackend::resumeQueue()
 {
-    const QString kind = currentKind();
-    if (m_queueActive || (!hasQueuedFor(kind) && runningCount() == 0))
+    if (m_queueActive)
         return;
-    m_activeKind = kind;
+
+    if (m_suspended) {
+        setRunningSuspended(false);
+        m_suspended = false;
+        log(QStringLiteral("INFO"), QStringLiteral("queue"), QStringLiteral("继续转换"));
+    }
+
+    if (!hasQueued() && runningCount() == 0)
+        return;
+
     m_queueActive = true;
     emit queueActiveChanged();
     schedule();
@@ -1184,10 +1232,16 @@ void ConverterBackend::resumeQueue()
 
 void ConverterBackend::stopAll()
 {
-    if (m_running.isEmpty() && !m_queueActive) {
+    if (m_running.isEmpty() && !m_queueActive && !m_suspended) {
         emit toast(QStringLiteral("当前没有正在进行的转换"), QStringLiteral("info"));
         return;
     }
+
+    if (m_suspended) {
+        setRunningSuspended(false);
+        m_suspended = false;
+    }
+
     m_queueActive = false;
     m_activeKind.clear();
     emit queueActiveChanged();
